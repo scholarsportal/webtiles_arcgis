@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no"/>
+    <title>Simple Map</title>
+    <link rel="stylesheet" href="https://js.arcgis.com/3.18/esri/css/esri.css">
+     <style>
+     #map, html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
+     #map{ margin: 0; padding: 0; }
+    </style>
+   <script src="http://serverapi.arcgisonline.com/jsapi/arcgis/?v=2.6"></script>
+	<script src="jquery-1.11.1.min.js"></script>
+	<script src="globalMercator.js"></script>
+    <script>
+	/*
+		The following application allows you to pass the path of a TiledMapServiceLayer as a url parameter with the name "url"
+		The system will then display the layer on the map and zoom to that location
+		
+		For example, if your tile images  reside at the path http://images.scholarsportal.info/tiles/HTDP63360K030L14_1929TIFF/
+		simply appand it to the end of your application installation server path as follows:
+		{myserverpath}?url=http://images.scholarsportal.info/tiles/HTDP63360K030L14_1929TIFF/
+		
+		Note: the tilemapresource.xml (which should be in the root of the tile folder) will need to accessible to your domain otherwise an Access-Control-Allow-Origin error will be thrown
+	
+	*/
+    var map;
+	var mouse_point;
+	  dojo.require("esri.map");
+	  function init(){
+        map = new esri.Map("map",{
+			 wrapAround180:true,
+			 center: [-79.623, 42.827], // longitude, latitude
+            logo:false
+		});
+	   var basemap = new esri.layers.ArcGISTiledMapServiceLayer("http://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer");
+		map.addLayer(basemap);
+	    initLayer(getUrlParameter('url'));
+      }
+      
+	  function initLayer(_url){
+		$.ajax({  
+        type: "GET",  
+        url: _url+"tilemapresource.xml",
+        dataType: "xml",
+        async: true,
+        success: function(xml){
+            var data = $(xml)
+             setupLayer(_url,data)    
+        }
+    });	
+	}
+	function setupLayer(_url,data){
+	   var lyr=new geoportal.Layer.TMSLayer(_url,data);
+	   lyr.setOpacity(.8)
+       map.addLayer(lyr); 
+	   //zoom to the maps extent
+	   map.setExtent(lyr.fullExtent);
+	}
+	var getUrlParameter = function getUrlParameter(sParam) {
+		var sPageURL = decodeURIComponent(window.location.search.substring(1)),
+			sURLVariables = sPageURL.split('&'),
+			sParameterName,
+			i;
+
+		for (i = 0; i < sURLVariables.length; i++) {
+			sParameterName = sURLVariables[i].split('=');
+
+			if (sParameterName[0] === sParam) {
+				return sParameterName[1] === undefined ? true : sParameterName[1];
+			}
+		}
+	};
+//#######################################
+	dojo.declare("geoportal.Layer.TMSLayer", esri.layers.TiledMapServiceLayer, {
+		constructor: function(_url, data) {
+			layerWKID=102100
+			this.url=_url
+			var minx=  data.find('BoundingBox').attr('minx');
+			var miny=  data.find('BoundingBox').attr('miny');
+			var maxx=  data.find('BoundingBox').attr('maxx');
+			var maxy=  data.find('BoundingBox').attr('maxy');
+			//
+			this.width=  Number(data.find('TileFormat').attr('width'));
+			this.height=  Number(data.find('TileFormat').attr('height'));
+			var ext=  data.find('TileFormat').attr('extension');
+			//
+			var proj=  data.find('SRS').text().split(":");
+			//
+			//calculate the orgin
+			var point=new esri.geometry.Point(minx,maxy, new esri.SpatialReference({ wkid: proj[1] }))
+			var point_wm= esri.geometry.geographicToWebMercator(point)
+			//
+			this.origin_x=point_wm.x
+			this.origin_y=point_wm.y
+			//findout the true origin by calculating the top left where the image starts// arbitrarily start at 6
+			var point_p = mercator.metersToPixels(this.origin_x, this.origin_y, 6);
+			var x_tile_start=Math.floor(point_p[0]/this.width)*this.width;
+			var y_tile_start=(Math.floor(point_p[1]/this.height)+1)*this.height;
+			var point_m = mercator.pixelsToMeters(x_tile_start, y_tile_start, 6);
+			//update origin
+			this.origin_x=point_m[0]
+			this.origin_y=point_m[1]
+			//finish the bounds
+			var point2=new esri.geometry.Point(maxx,miny, new esri.SpatialReference({ wkid: proj[1] }))
+			var point2_wm= esri.geometry.geographicToWebMercator(point2);
+			//
+			this.initialExtent = (this.fullExtent = new esri.geometry.Extent(point_wm.x,point2_wm.y,point2_wm.x,point_wm.y, new esri.SpatialReference({ wkid:layerWKID })));
+			this.spatialReference = new esri.SpatialReference({wkid:layerWKID});
+			this.tileInfo = new esri.layers.TileInfo({
+			spatialReference: new esri.SpatialReference({
+			  "wkid": layerWKID
+			}),
+			rows: this.width,
+			cols: this.height,
+			origin: {
+			  "x": this.origin_x,
+			  "y": this.origin_y
+			},
+			lods: [
+				  { "level": 6, "resolution": 2445.9849046875, "scale": 9244648.868616 },
+				   { "level": 7, "resolution": 1222.99245234375007, "scale": 4622324.434308 },
+				   { "level": 8, "resolution": 611.49622617187504, "scale": 2311162.217154 },
+				   { "level": 9, "resolution": 305.748113140558, "scale": 1155581.108577 },
+					{ "level": 10, "resolution": 152.874056570411, "scale": 577790.554289 },
+					{ "level": 11, "resolution": 76.4370282850732, "scale": 288895.277144 },
+					{ "level": 12, "resolution": 38.2185141425366, "scale": 144447.638572 },
+					{ "level": 13, "resolution": 19.1092570712683, "scale": 72223.819286 },
+					{ "level": 14, "resolution": 9.55462853563415, "scale": 36111.909643 },
+					{ "level": 15, "resolution": 4.77731426794937, "scale": 18055.954822 },
+					{ "level": 16, "resolution": 2.38865713397468, "scale": 9027.977411 }
+			]
+		})
+			this.loaded = true;
+			this.onLoad(this);
+		},
+		getTileUrl: function(level, row, col) {
+		  //get the starting row and column for each level
+		  var point = mercator.metersToPixels(this.origin_x, this.origin_y, map.getLevel());
+			var x_start=Math.floor(point[0]/this.width)
+			var y_start=Math.floor(point[1]/this.height)-1
+			return this.url +
+			 level + "/" +
+			  (x_start+col) +"/" +
+			  (y_start-row) + "." +
+			  "png";
+		}
+	});
+	dojo.ready(init)
+    </script>
+  </head>
+  <body>
+    <div id="map"></div>
+  </body>
+</html>
