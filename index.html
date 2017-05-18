@@ -139,7 +139,7 @@
 			var x_start=Math.floor(point[0]/this.width)
 			var y_start=Math.floor(point[1]/this.height)//-1 //for GDAL TMS
 			//return this.url + level + "/" + (x_start+col) +"/" +(y_start-row) + "." + "png"; //for GDAL TMS
-			return this.url + level + "/" + (x_start+col) +"/" +(y_start+row) + "." + "png";
+			return this.url + level + "/" + (x_start+col) +"/" +(Math.pow(2,level)-y_start+row) + "." + "png";
 		}
 	});
 	dojo.ready(init)
