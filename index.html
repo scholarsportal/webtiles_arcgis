@@ -134,15 +134,12 @@
 			this.onLoad(this);
 		},
 		getTileUrl: function(level, row, col) {
-		  //get the starting row and column for each level
-		  var point = mercator.metersToPixels(this.origin_x, this.origin_y, map.getLevel());
+		 	//get the starting row and column for each level
+		 	var point = mercator.metersToPixels(this.origin_x, this.origin_y, map.getLevel());
 			var x_start=Math.floor(point[0]/this.width)
-			var y_start=Math.floor(point[1]/this.height)-1
-			return this.url +
-			 level + "/" +
-			  (x_start+col) +"/" +
-			  (y_start-row) + "." +
-			  "png";
+			var y_start=Math.floor(point[1]/this.height)//-1 //for GDAL TMS
+			//return this.url + level + "/" + (x_start+col) +"/" +(y_start-row) + "." + "png"; //for GDAL TMS
+			return this.url + level + "/" + (x_start+col) +"/" +(y_start+row) + "." + "png";
 		}
 	});
 	dojo.ready(init)
